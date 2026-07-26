@@ -1,0 +1,36 @@
+name: Sync Upstream Fork
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Runs weekly
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to push changes back to master
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }} # Critical: Pushing with PAT triggers downstream build workflows
+          fetch-depth: 0
+
+      - name: Sync with Official Upstream
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Add the official NSA repository as an upstream remote
+          git remote add upstream https://github.com/NationalSecurityAgency/ghidra.git
+          git fetch upstream master
+          
+          # Force checkout local master tracking origin/master
+          git checkout -B master origin/master
+          
+          # Merge upstream changes, allowing integration of divergent custom workflow files
+          git merge upstream/master --allow-unrelated-histories --no-ff -m "Auto-sync with official upstream ghidra"
+          
+          # Authenticate and push back to master using PAT
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git master:master

@@ -1,0 +1,99 @@
+name: Build Ghidra ARM64 Variants
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    name: Build for ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04-arm
+            platform_name: linux_arm_64
+          - os: macos-14
+            platform_name: mac_arm_64
+          - os: windows-11-arm
+            platform_name: win_arm_64
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Read Ghidra JDK Version
+        shell: bash
+        run: |
+          # Strip Windows carriage returns to avoid string parsing mismatches inside gradlew shell scripts
+          tr -d '\r' < Ghidra/application.properties > Ghidra/application.properties.tmp
+          mv Ghidra/application.properties.tmp Ghidra/application.properties
+          MIN_VER=$(awk -F'=' '$1=="application.java.min" {print $2}' Ghidra/application.properties | tr -d '[:space:]')
+          echo "JDK_VER=${MIN_VER:-17}" >> $GITHUB_ENV
+
+      - name: Set up Java Development Kit
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '${{ env.JDK_VER }}'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          dependency-graph: 'disabled'
+
+      - name: Fetch Dependencies
+        shell: bash
+        run: |
+          ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse --no-daemon --max-workers=1 --no-parallel
+
+      - name: Build Ghidra Distribution Package
+        shell: bash
+        run: |
+          ./gradlew buildGhidra -PcurrentPlatformName=${{ matrix.platform_name }} --no-daemon
+
+      - name: Rename Distribution Zip for Platform
+        shell: bash
+        run: |
+          find . -type f -path "*/build/dist/*.zip" | while read filepath; do
+            mv "$filepath" "${filepath%.zip}-${{ matrix.platform_name }}.zip"
+          done
+
+      - name: Locate and Upload Distribution Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghidra-distribution-${{ matrix.platform_name }}
+          path: "**/build/dist/*.zip"
+          if-no-files-found: error
+
+  publish-release:
+    needs: build-arm64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: ghidra-distribution-*
+          merge-multiple: true
+
+      - name: Delete old release to refresh timestamp and changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete latest --cleanup-tag -y -R ${{ github.repository }} || true
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "latest"
+          name: "Latest Automated Build"
+          body: "Automated continuous build of Ghidra ARM64 variants for Windows, macOS, and Linux."
+          files: "release-artifacts/**/*.zip"
