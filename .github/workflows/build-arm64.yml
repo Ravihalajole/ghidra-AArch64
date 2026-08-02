@@ -56,7 +56,7 @@ jobs:
       - name: Build Ghidra Distribution Package
         shell: bash
         run: |
-          ./gradlew buildGhidra -PcurrentPlatformName=${{ matrix.platform_name }} --no-daemon
+          ./gradlew buildGhidra -PcurrentPlatformName=${{ matrix.platform_name }} --no-daemon --max-workers=2
 
       - name: Rename Distribution Zip for Platform
         shell: bash
