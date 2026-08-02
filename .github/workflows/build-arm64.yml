@@ -1,4 +1,4 @@
-name: Build Ghidra ARM64 Variants
+Name: Build Ghidra ARM64 Variants
 
 on:
   push:
@@ -19,10 +19,6 @@ jobs:
         include:
           - os: ubuntu-24.04-arm
             platform_name: linux_arm_64
-          - os: macos-14
-            platform_name: mac_arm_64
-          - os: windows-11-arm
-            platform_name: win_arm_64
 
     steps:
       - name: Checkout Source Code
@@ -51,12 +47,12 @@ jobs:
       - name: Fetch Dependencies
         shell: bash
         run: |
-          ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse --no-daemon --max-workers=1 --no-parallel
+          ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse --no-daemon
 
       - name: Build Ghidra Distribution Package
         shell: bash
         run: |
-          ./gradlew buildGhidra -PcurrentPlatformName=${{ matrix.platform_name }} --no-daemon --max-workers=2
+          ./gradlew buildGhidra -PcurrentPlatformName=${{ matrix.platform_name }} --no-daemon
 
       - name: Rename Distribution Zip for Platform
         shell: bash
@@ -95,5 +91,5 @@ jobs:
         with:
           tag_name: "latest"
           name: "Latest Automated Build"
-          body: "Automated continuous build of Ghidra ARM64 variants for Windows, macOS, and Linux."
+          body: "Automated continuous build of Ghidra ARM64 Linux variant."
           files: "release-artifacts/**/*.zip"
