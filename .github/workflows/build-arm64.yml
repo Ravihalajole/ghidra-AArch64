@@ -1,4 +1,4 @@
-Name: Build Ghidra ARM64 Variants
+name: Build Ghidra ARM64 Variants
 
 on:
   push:
@@ -47,12 +47,12 @@ jobs:
       - name: Fetch Dependencies
         shell: bash
         run: |
-          ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse --no-daemon
+          ./gradlew -I gradle/support/fetchDependencies.gradle -DhideDownloadProgress -DnoEclipse --no-daemon --max-workers=1 --no-parallel
 
       - name: Build Ghidra Distribution Package
         shell: bash
         run: |
-          ./gradlew buildGhidra -PcurrentPlatformName=${{ matrix.platform_name }} --no-daemon
+          ./gradlew buildGhidra -PcurrentPlatformName=${{ matrix.platform_name }} --no-daemon --max-workers=2
 
       - name: Rename Distribution Zip for Platform
         shell: bash
